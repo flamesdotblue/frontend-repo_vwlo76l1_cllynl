@@ -35,7 +35,7 @@ function App() {
         <div className="flex-1 min-h-screen text-white">
           <Topbar active={active} />
           {active === 'predictor' ? (
-            <Predictor user={user} onSaved={() => {}} />
+            <Predictor user={user} onSaved={() => setActive('history')} />
           ) : (
             <History user={user} />
           )}

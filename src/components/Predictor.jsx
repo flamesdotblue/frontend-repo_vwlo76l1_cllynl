@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { FlaskConical, Rocket, Loader2 } from 'lucide-react';
+import StructureBar from './StructureBar';
 
 function randomStructure(length) {
   const chars = ['H', 'E', 'C'];
@@ -12,6 +13,43 @@ function randomStructure(length) {
 
 function randomConfidence() {
   return (Math.random() * (99.9 - 60.0) + 60.0).toFixed(1);
+}
+
+function generateContactMap(n) {
+  // Sparse symmetric matrix with higher probability for medium-range contacts
+  const probNear = 0.03;
+  const probMid = 0.06;
+  const probFar = 0.015;
+  const m = Array.from({ length: n }, () => Array.from({ length: n }, () => 0));
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const d = Math.abs(j - i);
+      let p = d < 6 ? probNear : d < 20 ? probMid : probFar;
+      if (Math.random() < p) {
+        m[i][j] = 1;
+        m[j][i] = 1;
+      }
+    }
+  }
+  return m;
+}
+
+function computeAnalysis(seq) {
+  const aa = seq.replace(/\s|>/g, '').toUpperCase();
+  const len = aa.length;
+  const massMap = {
+    A: 89.09, R: 174.20, N: 132.12, D: 133.10, C: 121.16, E: 147.13, Q: 146.15, G: 75.07, H: 155.16, I: 131.18,
+    L: 131.18, K: 146.19, M: 149.21, F: 165.19, P: 115.13, S: 105.09, T: 119.12, W: 204.23, Y: 181.19, V: 117.15
+  };
+  let mw = 18.015; // add water for termini
+  for (const c of aa) mw += massMap[c] || 0;
+  const kDa = (mw / 1000).toFixed(1);
+  const pI = (5.5 + Math.random() * 3).toFixed(2);
+  const domains = [
+    `Pfam: Kinase_dom (Residues ${Math.max(1, Math.floor(len * 0.1))}-${Math.max(2, Math.floor(len * 0.4))}, Conf: ${(95 + Math.random() * 5).toFixed(1)}%)`,
+    `Pfam: SH3 (Residues ${Math.max(2, Math.floor(len * 0.55))}-${Math.max(3, Math.floor(len * 0.72))}, Conf: ${(80 + Math.random() * 10).toFixed(1)}%)`
+  ];
+  return { molecularWeight: `${kDa} kDa`, pI, predictedDomains: domains };
 }
 
 export default function Predictor({ user, onSaved }) {
@@ -28,20 +66,25 @@ export default function Predictor({ user, onSaved }) {
     setLoading(true);
     setResult(null);
     setTimeout(() => {
-      const len = (sequence || '').replace(/\s|>/g, '').length;
+      const cleanSeq = (sequence || '').trim();
+      const len = cleanSeq.replace(/\s|>/g, '').length;
       const predictedStructure = randomStructure(len);
       const confidence = parseFloat(randomConfidence());
       const createdAt = new Date().toISOString();
+      const contactMap = generateContactMap(Math.min(len, 120)); // cap size for performance
+      const analysis = computeAnalysis(cleanSeq);
       const doc = {
         id: crypto.randomUUID(),
-        proteinName: proteinName || 'Untitled Protein',
-        sequence: sequence.trim(),
+        proteinName: proteinName?.trim() ? proteinName.trim() : 'Untitled Protein',
+        sequence: cleanSeq,
         predictedStructure,
         confidence,
         createdAt,
+        contactMap,
+        analysis,
       };
 
-      // Persist to localStorage under the user's space
+      // Persist to localStorage under the user's space (simulating backend)
       const baseKey = `artifacts.betafold-app.users.${user.email}.predictions`;
       const list = JSON.parse(localStorage.getItem(baseKey) || '[]');
       list.unshift(doc);
@@ -50,7 +93,10 @@ export default function Predictor({ user, onSaved }) {
       setResult(doc);
       setLoading(false);
       onSaved?.(doc);
-    }, 1500 + Math.random() * 800);
+      // Clear the form
+      setProteinName('');
+      setSequence('');
+    }, 1600 + Math.random() * 900);
   };
 
   return (
@@ -106,9 +152,9 @@ export default function Predictor({ user, onSaved }) {
               <div>How it works:</div>
               <ul className="list-disc pl-5 space-y-1">
                 <li>Input your protein sequence in standard amino acid format.</li>
-                <li>Our AI analyzes secondary structure, domains, and folding patterns.</li>
-                <li>Get detailed predictions about your protein's 2D structure.</li>
-                <li>Results include confidence scores and a predicted secondary structure map.</li>
+                <li>Our AI analyzes secondary structure, domains, and contacts.</li>
+                <li>Get a visual secondary structure bar and a 2D contact map.</li>
+                <li>Results include confidence scores and additional analysis.</li>
               </ul>
             </div>
           </form>
@@ -133,7 +179,25 @@ export default function Predictor({ user, onSaved }) {
             </div>
             <div className="mt-4">
               <div className="text-white/50 text-sm mb-1">Predicted Secondary Structure</div>
-              <pre className="bg-black/50 border border-white/10 rounded-lg p-3 overflow-x-auto text-fuchsia-300 text-xs whitespace-pre-wrap break-all">{result.predictedStructure}</pre>
+              <StructureBar structure={result.predictedStructure} height={10} />
+            </div>
+            <div className="mt-4 grid md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <div className="text-white/50">Molecular Weight</div>
+                <div className="font-medium">{result.analysis?.molecularWeight}</div>
+              </div>
+              <div>
+                <div className="text-white/50">Isoelectric Point (pI)</div>
+                <div className="font-medium">{result.analysis?.pI}</div>
+              </div>
+              <div>
+                <div className="text-white/50">Predicted Domains</div>
+                <div className="font-medium space-y-1">
+                  {result.analysis?.predictedDomains?.map((d, i) => (
+                    <div key={i} className="text-xs text-white/80">• {d}</div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
