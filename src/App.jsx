@@ -1,28 +1,48 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react';
+import LoginView from './components/LoginView';
+import Sidebar from './components/Sidebar';
+import Predictor from './components/Predictor';
+import History from './components/History';
+import Topbar from './components/Topbar';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [user, setUser] = useState(null);
+  const [active, setActive] = useState('predictor'); // 'predictor' | 'history'
+
+  useEffect(() => {
+    const raw = localStorage.getItem('betafold_session_v1');
+    if (raw) {
+      try {
+        const u = JSON.parse(raw);
+        if (u?.email) setUser(u);
+      } catch {}
+    }
+  }, []);
+
+  const handleSignOut = () => {
+    localStorage.removeItem('betafold_session_v1');
+    setUser(null);
+  };
+
+  if (!user) {
+    return <LoginView onLogin={setUser} />;
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-lg shadow-lg">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">
-          Vibe Coding Platform
-        </h1>
-        <p className="text-gray-600 mb-6">
-          Your AI-powered development environment
-        </p>
-        <div className="text-center">
-          <button
-            onClick={() => setCount(count + 1)}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded"
-          >
-            Count is {count}
-          </button>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-950 to-black">
+      <div className="flex">
+        <Sidebar user={user} active={active} onNavigate={setActive} onSignOut={handleSignOut} />
+        <div className="flex-1 min-h-screen text-white">
+          <Topbar active={active} />
+          {active === 'predictor' ? (
+            <Predictor user={user} onSaved={() => {}} />
+          ) : (
+            <History user={user} />
+          )}
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
