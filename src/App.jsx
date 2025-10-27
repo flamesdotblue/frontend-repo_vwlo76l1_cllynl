@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import Predictor from './components/Predictor';
 import History from './components/History';
 import Topbar from './components/Topbar';
+import HeroSpline from './components/HeroSpline';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -34,6 +35,7 @@ function App() {
         <Sidebar user={user} active={active} onNavigate={setActive} onSignOut={handleSignOut} />
         <div className="flex-1 min-h-screen text-white">
           <Topbar active={active} />
+          <HeroSpline />
           {active === 'predictor' ? (
             <Predictor user={user} onSaved={() => setActive('history')} />
           ) : (

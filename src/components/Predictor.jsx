@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FlaskConical, Rocket, Loader2 } from 'lucide-react';
 import StructureBar from './StructureBar';
+import TopologyDiagram from './TopologyDiagram';
 
 function randomStructure(length) {
   const chars = ['H', 'E', 'C'];
@@ -13,25 +14,6 @@ function randomStructure(length) {
 
 function randomConfidence() {
   return (Math.random() * (99.9 - 60.0) + 60.0).toFixed(1);
-}
-
-function generateContactMap(n) {
-  // Sparse symmetric matrix with higher probability for medium-range contacts
-  const probNear = 0.03;
-  const probMid = 0.06;
-  const probFar = 0.015;
-  const m = Array.from({ length: n }, () => Array.from({ length: n }, () => 0));
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const d = Math.abs(j - i);
-      let p = d < 6 ? probNear : d < 20 ? probMid : probFar;
-      if (Math.random() < p) {
-        m[i][j] = 1;
-        m[j][i] = 1;
-      }
-    }
-  }
-  return m;
 }
 
 function computeAnalysis(seq) {
@@ -50,6 +32,33 @@ function computeAnalysis(seq) {
     `Pfam: SH3 (Residues ${Math.max(2, Math.floor(len * 0.55))}-${Math.max(3, Math.floor(len * 0.72))}, Conf: ${(80 + Math.random() * 10).toFixed(1)}%)`
   ];
   return { molecularWeight: `${kDa} kDa`, pI, predictedDomains: domains };
+}
+
+function parseTopology(structureString) {
+  const els = [];
+  if (!structureString) return els;
+  let current = structureString[0];
+  let length = 1;
+  let h = 0, e = 0, l = 0;
+  for (let i = 1; i < structureString.length; i++) {
+    if (structureString[i] === current) {
+      length++;
+    } else {
+      let label;
+      if (current === 'H') label = `H${++h}`;
+      else if (current === 'E') label = `E${++e}`;
+      else label = `L${++l}`;
+      els.push({ type: current, length, label });
+      current = structureString[i];
+      length = 1;
+    }
+  }
+  let label;
+  if (current === 'H') label = `H${++h}`;
+  else if (current === 'E') label = `E${++e}`;
+  else label = `L${++l}`;
+  els.push({ type: current, length, label });
+  return els;
 }
 
 export default function Predictor({ user, onSaved }) {
@@ -71,8 +80,8 @@ export default function Predictor({ user, onSaved }) {
       const predictedStructure = randomStructure(len);
       const confidence = parseFloat(randomConfidence());
       const createdAt = new Date().toISOString();
-      const contactMap = generateContactMap(Math.min(len, 120)); // cap size for performance
       const analysis = computeAnalysis(cleanSeq);
+      const topologyElements = parseTopology(predictedStructure);
       const doc = {
         id: crypto.randomUUID(),
         proteinName: proteinName?.trim() ? proteinName.trim() : 'Untitled Protein',
@@ -80,8 +89,8 @@ export default function Predictor({ user, onSaved }) {
         predictedStructure,
         confidence,
         createdAt,
-        contactMap,
         analysis,
+        topologyElements: JSON.stringify(topologyElements),
       };
 
       // Persist to localStorage under the user's space (simulating backend)
@@ -107,7 +116,7 @@ export default function Predictor({ user, onSaved }) {
             <div>
               <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Betafold: 2D Structure Prediction</h2>
               <p className="text-white/60 mt-2 max-w-2xl">
-                Advanced machine learning analysis for 2D protein structure and contact prediction.
+                Advanced machine learning analysis for 2D protein secondary structure and topology.
               </p>
             </div>
             <div className="hidden md:block p-3 rounded-xl bg-white/5 border border-white/10">
@@ -152,8 +161,8 @@ export default function Predictor({ user, onSaved }) {
               <div>How it works:</div>
               <ul className="list-disc pl-5 space-y-1">
                 <li>Input your protein sequence in standard amino acid format.</li>
-                <li>Our AI analyzes secondary structure, domains, and contacts.</li>
-                <li>Get a visual secondary structure bar and a 2D contact map.</li>
+                <li>Our AI analyzes secondary structure and predicts topology segments.</li>
+                <li>Get a visual secondary structure bar and a 2D topology diagram (SVG).</li>
                 <li>Results include confidence scores and additional analysis.</li>
               </ul>
             </div>
@@ -181,7 +190,14 @@ export default function Predictor({ user, onSaved }) {
               <div className="text-white/50 text-sm mb-1">Predicted Secondary Structure</div>
               <StructureBar structure={result.predictedStructure} height={10} />
             </div>
-            <div className="mt-4 grid md:grid-cols-3 gap-4 text-sm">
+            <div className="mt-6">
+              <div className="text-md font-semibold text-gray-200 mb-2">2D Topology Diagram</div>
+              <p className="text-sm text-gray-400 mb-3">Schematic of predicted secondary structure elements.</p>
+              <div className="p-4 bg-gray-800 rounded-lg overflow-x-auto">
+                <TopologyDiagram elements={JSON.parse(result.topologyElements || '[]')} height={120} />
+              </div>
+            </div>
+            <div className="mt-6 grid md:grid-cols-3 gap-4 text-sm">
               <div>
                 <div className="text-white/50">Molecular Weight</div>
                 <div className="font-medium">{result.analysis?.molecularWeight}</div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import StructureBar from './StructureBar';
-import ContactMapCanvas from './ContactMapCanvas';
+import TopologyDiagram from './TopologyDiagram';
 
 function loadUserPredictions(email) {
   const key = `artifacts.betafold-app.users.${email}.predictions`;
@@ -60,13 +60,10 @@ export default function History({ user }) {
                         <pre className="bg-black/50 border border-white/10 rounded-lg p-3 overflow-x-auto text-emerald-300 text-xs whitespace-pre-wrap break-all">{it.sequence}</pre>
                       </div>
                       <div>
-                        <div className="text-xs text-white/60 mb-1">2D Contact Map</div>
-                        <div className="flex items-center gap-4">
-                          <ContactMapCanvas matrix={it.contactMap} size={260} dotSize={2} />
-                          <div className="text-xs text-white/60">
-                            <div>Dots indicate predicted residue-residue contacts.</div>
-                            <div className="mt-1">Diagonal shows sequence index parity.</div>
-                          </div>
+                        <h4 className="text-md font-semibold text-gray-200 mb-2">2D Topology Diagram</h4>
+                        <p className="text-sm text-gray-400 mb-3">Schematic of predicted secondary structure elements.</p>
+                        <div className="p-4 bg-gray-800 rounded-lg overflow-x-auto">
+                          <TopologyDiagram elements={JSON.parse(it.topologyElements || '[]')} height={120} />
                         </div>
                       </div>
                     </div>
